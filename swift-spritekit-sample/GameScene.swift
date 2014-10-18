@@ -18,12 +18,18 @@ class GameScene: SKScene , SKPhysicsContactDelegate {
     }
     
     var player: SKNode?
+    var moveRect: SKNode?
+    var target: SKNode?
+    var enemy: SKNode?
+    
+    var life = 10
     
     // カテゴリを用意しておく。
     let wallCategory: UInt32 = 0x1 << 0
     let blueCategory: UInt32 = 0x1 << 1
     let redCategory: UInt32 = 0x1 << 2
     let greenCategory: UInt32 = 0x1 << 3
+    let enemyCategory: UInt32 = 0x1 << 4
     
     // 玉を生成
     func newBall(color: UIColor, categoryBitMask: UInt32, contactTestBitMask: UInt32) -> SKNode {
@@ -51,6 +57,19 @@ class GameScene: SKScene , SKPhysicsContactDelegate {
         rect.position = CGPointMake(x, y)
         rect.physicsBody = SKPhysicsBody(rectangleOfSize: rect.size)
         rect.physicsBody?.dynamic = false // 動かない
+        rect.physicsBody?.categoryBitMask = redCategory
+        rect.physicsBody?.contactTestBitMask = 0 // 初期化しないと不定値が入る
+        return rect
+    }
+    
+    func newDyRect(x: CGFloat, y: CGFloat) -> SKNode {
+        let rect = SKSpriteNode(
+            color: UIColor.redColor(),
+            size: CGSizeMake(160, 80)
+        )
+        rect.position = CGPointMake(x, y)
+        rect.physicsBody = SKPhysicsBody(rectangleOfSize: rect.size)
+        rect.physicsBody?.dynamic = false
         rect.physicsBody?.categoryBitMask = redCategory
         rect.physicsBody?.contactTestBitMask = 0 // 初期化しないと不定値が入る
         return rect
@@ -85,26 +104,35 @@ class GameScene: SKScene , SKPhysicsContactDelegate {
             [295.466674804688,452.266723632812],
             [354.133331298828,461.86669921875],
             [400.0,452.266723632812],
-            [451.200012207031,454.400024414062],
-            [683.733337402344,410.666687011719],
-            [724.266662597656,412.800048828125],
-            [760.533325195312,406.400024414062]
+            //[451.200012207031,454.400024414062],
+            //[683.733337402344,410.666687011719],
+            //[724.266662597656,412.800048828125],
+            //[760.533325195312,406.400024414062]
         ]
         // 床配置
         for floor in floorPositions {
             addChild(newRect(floor[0],y:floor[1]))
         }
         
+        moveRect = newDyRect(620.0, y: 400.0)
+        addChild(moveRect!)
+        
         player = newBall(SKColor.blueColor(),
             categoryBitMask: blueCategory,
             contactTestBitMask: greenCategory)
         addChild(player!)
         
-        let greenBall = newBall(SKColor.greenColor(),
+        target = newBall(SKColor.greenColor(),
             categoryBitMask: greenCategory,
             contactTestBitMask: blueCategory)
-        greenBall.position.x += 500
-        addChild(greenBall)
+        target?.position.x += 500
+        addChild(target!)
+        
+        enemy = newBall(SKColor.blackColor(),
+            categoryBitMask: enemyCategory,
+            contactTestBitMask: blueCategory)
+        addChild(enemy!)
+        enemy?.position.x += 100
         
         self.physicsBody = SKPhysicsBody(edgeLoopFromRect: self.frame)
         self.physicsBody?.categoryBitMask = wallCategory
@@ -132,11 +160,24 @@ class GameScene: SKScene , SKPhysicsContactDelegate {
     
     override func update(currentTime: CFTimeInterval) {
         /* Called before each frame is rendered */
+        moveRect?.position.x += sin(CGFloat(CFAbsoluteTimeGetCurrent()))
+        if(enemy?.position.x < player?.position.x) {
+            enemy?.physicsBody?.applyImpulse(CGVectorMake(0.35,3))
+        } else {
+            enemy?.physicsBody?.applyImpulse(CGVectorMake(-0.35,3))
+        }
+        if(Int(currentTime) % 5 == 1) {
+                target?.position.x = skRand(0, high: 1000)
+                target?.position.y = 730
+        }
     }
+    
     var i : UInt8 = 1
+    
     func didBeginContact(contact: SKPhysicsContact!) {
         
         var firstBody, secondBody: SKPhysicsBody
+
         
         // firstを青、secondを緑とする。
         if contact.bodyA.categoryBitMask < contact.bodyB.categoryBitMask {
@@ -158,5 +199,19 @@ class GameScene: SKScene , SKPhysicsContactDelegate {
                     y:skRand(0, high: CGRectGetMaxY(self.frame)));
                 addChild(label)
         }
+        
+        if ((firstBody.categoryBitMask & blueCategory) != 0) &&
+            ((secondBody.categoryBitMask & enemyCategory) != 0) &&
+           (life > 0) {
+                let label = SKLabelNode(fontNamed:"Chalkduster")
+                life -= 1
+                label.text = "\(life)"
+                label.fontSize = 65
+                
+                label.position = CGPoint(x:skRand(0, high: CGRectGetMaxX(self.frame)),
+                    y:skRand(0, high: CGRectGetMaxY(self.frame)));
+                addChild(label)
+        }
+        
     }
 }
